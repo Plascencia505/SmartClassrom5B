@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "45153029931",
+    "firebase_url": "https://smartclassroom-b40d1-default-rtdb.firebaseio.com",
+    "project_id": "smartclassroom-b40d1",
+    "storage_bucket": "smartclassroom-b40d1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:45153029931:android:9358f227cd2a1a9e677f6e",
+        "android_client_info": {
+          "package_name": "com.gapf.smartclassrom"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAQF17nlbaA6SKibxOY1sT6hxBVNvnvKRk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
