@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'login_page.dart';
-import 'dashboard_admin.dart';
-import 'dashboard_maestro.dart';
+import 'package:smartclassrom/pages/dashboard_admin.dart';
+import 'package:smartclassrom/pages/dashboard_maestro.dart';
+import 'package:smartclassrom/pages/login_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Inicializa Firebase con la configuración de FlutterFire
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
   runApp(const SmartClassApp());
 }
 
