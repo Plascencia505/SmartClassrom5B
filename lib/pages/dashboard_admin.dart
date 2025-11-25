@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:smartclassrom/models/salon_status.dart'; // Verifica tu ruta de importación
+import 'package:smartclassrom/models/salon_status.dart'; // Modelo para mapear el estado del salón
 
 class DashboardAdmin extends StatefulWidget {
   const DashboardAdmin({super.key});
@@ -11,8 +11,10 @@ class DashboardAdmin extends StatefulWidget {
 }
 
 class _DashboardAdminState extends State<DashboardAdmin> {
+  // Referencia principal al Realtime Database
   final DatabaseReference _dbRef = FirebaseDatabase.instance.ref();
 
+  // Mapeo entre IDs del RTDB y documentos de Firestore
   final Map<String, String> _mapaRealtimeFirestore = {
     'monitor': 'MONITOR',
     'salon1': 'S1',
@@ -20,6 +22,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
     'salon3': 'S3',
   };
 
+  // Nombres descriptivos de cada salón mostrados en UI
   final Map<String, String> _nombresSalones = {
     'monitor': 'Laboratorio IoT (Monitor)',
     'salon1': 'Aula 101 - Matematicas',
@@ -31,7 +34,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Lógica responsiva para el Grid
+        // Configuración responsiva para la cuadrícula
         int columnas = 2;
         double aspectRatio = 0.8;
 
@@ -52,6 +55,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
               style: TextStyle(color: Colors.white),
             ),
             actions: [
+              // Cerrar sesión y regresar al login
               IconButton(
                 icon: const Icon(Icons.logout, color: Colors.white),
                 onPressed: () => Navigator.pushReplacementNamed(context, '/'),
@@ -63,6 +67,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Encabezado de sección
                 const Padding(
                   padding: EdgeInsets.only(left: 8, bottom: 10),
                   child: Text(
@@ -75,20 +80,25 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                   ),
                 ),
 
+                // Contenedor de tarjetas de salones
                 Expanded(
                   child: StreamBuilder(
-                    stream: _dbRef.onValue,
+                    stream: _dbRef.onValue, // Escucha cambios en tiempo real
                     builder: (context, snapshot) {
+                      // Si los datos no están disponibles aún
                       if (!snapshot.hasData ||
                           snapshot.data!.snapshot.value == null) {
                         return const Center(child: CircularProgressIndicator());
                       }
 
+                      // Obtiene el mapa completo del RTDB
                       final data =
                           snapshot.data!.snapshot.value
                               as Map<dynamic, dynamic>;
+
                       final List<SalonStatus> listaSalones = [];
 
+                      // Convierte cada nodo en un objeto SalonStatus
                       data.forEach((key, value) {
                         if (value is Map) {
                           try {
@@ -101,7 +111,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                         }
                       });
 
-                      // Ordenar: Monitor primero
+                      // Ordena los salones, dejando el "monitor" primero
                       listaSalones.sort(
                         (a, b) => (a.id == 'monitor')
                             ? -1
@@ -133,11 +143,13 @@ class _DashboardAdminState extends State<DashboardAdmin> {
     );
   }
 
+  // Construye la tarjeta visual del salón
   Widget _buildSalonCard(SalonStatus salon) {
     final nombre = _nombresSalones[salon.id] ?? "Salón ${salon.id}";
     final firestoreId = _mapaRealtimeFirestore[salon.id];
 
     return InkWell(
+      // Al tocar la tarjeta, muestra el modal con la asistencia
       onTap: () =>
           _mostrarDetalleAsistencia(context, salon, nombre, firestoreId),
       child: Card(
@@ -148,7 +160,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header con nombre y bolita de estado
+              // Encabezado con nombre de salón y estado del sistema
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -174,35 +186,42 @@ class _DashboardAdminState extends State<DashboardAdmin> {
               ),
               const Divider(),
 
-              // INFO DE SENSORES (Ahora incluye Humedad)
+              // Sensor temperatura
               _infoRow(
                 Icons.thermostat,
                 "${salon.temperatura}°C",
                 Colors.black87,
               ),
               const SizedBox(height: 5),
+
+              // Sensor de luz
               _infoRow(Icons.wb_sunny, "${salon.luz} lx", Colors.black87),
               const SizedBox(height: 5),
+
+              // Sensor humedad
               _infoRow(
                 Icons.water_drop,
                 "${salon.humedad}%",
                 Colors.blueAccent,
-              ), // <--- NUEVO
+              ),
 
               const Spacer(),
 
-              // ICONOS DE ACTUADORES (Actualizado al nuevo modelo)
+              // Indicadores de actuadores
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  // Ventilador (antes AC)
+                  // Ventilador activo/inactivo
                   _miniIcon(Icons.wind_power, salon.ventiladorActivo),
-                  // Ventana
+
+                  // Ventana abierta/cerrada
                   _miniIcon(Icons.window, salon.ventanaAbierta, alert: true),
                 ],
               ),
 
               const SizedBox(height: 10),
+
+              // Footer con texto para abrir asistencia
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 4),
@@ -224,7 +243,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
     );
   }
 
-  // --- MODAL DE DETALLE ---
+  // Modal que muestra detalles de la asistencia del salón
   void _mostrarDetalleAsistencia(
     BuildContext context,
     SalonStatus salon,
@@ -232,7 +251,8 @@ class _DashboardAdminState extends State<DashboardAdmin> {
     String? firestoreId,
   ) {
     if (firestoreId == null) return;
-    const String rfidRealAlumno = "CA 31 48 01";
+
+    const String rfidRealAlumno = "CA 31 48 01"; // RFID usado en demo
 
     showDialog(
       context: context,
@@ -249,6 +269,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Header con título y botón cerrar
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -270,6 +291,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                   ),
                   const Divider(),
 
+                  // Obtiene detalles desde Firestore
                   FutureBuilder<DocumentSnapshot>(
                     future: FirebaseFirestore.instance
                         .collection('salones')
@@ -282,6 +304,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
 
                       final salonData =
                           snapSalon.data!.data() as Map<String, dynamic>?;
+
                       if (salonData == null) {
                         return const Text("Datos no disponibles");
                       }
@@ -292,6 +315,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Información de materia y grupo
                           Text(
                             "Materia: $materia",
                             style: const TextStyle(fontSize: 16),
@@ -305,6 +329,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                           ),
                           const SizedBox(height: 20),
 
+                          // Carga de alumnos por grupo
                           StreamBuilder<QuerySnapshot>(
                             stream: FirebaseFirestore.instance
                                 .collection('alumnos')
@@ -315,18 +340,20 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                                   ConnectionState.waiting) {
                                 return const CircularProgressIndicator();
                               }
+
                               final docs = snapAlumnos.data?.docs ?? [];
+
                               if (docs.isEmpty) {
                                 return const Text(
                                   "No hay alumnos en este grupo.",
                                 );
                               }
 
+                              // Conteo rápido
                               int total = docs.length;
-                              int presentes = 0;
-                              for (var d in docs) {
-                                if (d['rfid'] == rfidRealAlumno) presentes++;
-                              }
+                              int presentes = docs
+                                  .where((d) => d['rfid'] == rfidRealAlumno)
+                                  .length;
 
                               return Card(
                                 elevation: 0,
@@ -335,6 +362,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: ExpansionTile(
+                                  // Cabecera del card con conteos
                                   title: Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
@@ -357,6 +385,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                                     ],
                                   ),
                                   children: [
+                                    // Lista de alumnos
                                     Container(
                                       height: 250,
                                       padding: const EdgeInsets.symmetric(
@@ -369,8 +398,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
                                               docs[i].data()
                                                   as Map<String, dynamic>;
                                           final isPresente =
-                                              (alumno['rfid'] ==
-                                              rfidRealAlumno);
+                                              alumno['rfid'] == rfidRealAlumno;
 
                                           return Container(
                                             margin: const EdgeInsets.only(
@@ -438,6 +466,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
     );
   }
 
+  // Genera fila para mostrar sensores
   Widget _infoRow(IconData i, String t, Color c) => Row(
     children: [
       Icon(i, size: 16, color: Colors.grey),
@@ -449,6 +478,7 @@ class _DashboardAdminState extends State<DashboardAdmin> {
     ],
   );
 
+  // Iconos pequeños para actuadores (ventana, ventilador, etc.)
   Widget _miniIcon(IconData i, bool active, {bool alert = false}) => Icon(
     i,
     size: 22,

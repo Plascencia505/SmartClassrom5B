@@ -3,6 +3,8 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:smartclassrom/models/salon_status.dart';
 
+/// Vista principal para el maestro.
+/// Muestra: estado del salón, sensores, actuadores y asistencia en vivo.
 class DashboardMaestro extends StatefulWidget {
   const DashboardMaestro({super.key});
 
@@ -14,13 +16,14 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
   final DatabaseReference _dbRef = FirebaseDatabase.instance.ref();
 
   Map<String, dynamic>? userData;
-  String? salonId; // ID para Realtime (ej: salon1)
-  String? salonNombre; // Nombre para mostrar (ej: S1)
-  String? grupoActual;
+  String? salonId; // ID usado en Realtime Database (ej: 'salon1')
+  String? salonNombre; // Nombre corto/bonito para mostrar (ej: 'S1')
+  String? grupoActual; // Grupo asignado del maestro
 
+  // RFID fijo para demo, coincide con la lectura en el salón real
   final String _rfidRealAlumno = "CA 31 48 01";
 
-  // TRADUCTOR: Firestore (Corto) -> Realtime (Largo)
+  /// Mapa que traduce IDs cortos de Firestore a IDs largos en Realtime DB
   final Map<String, String> _mapaIds = {
     'monitor': 'monitor',
     's1': 'salon1',
@@ -28,6 +31,7 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
     's3': 'salon3',
   };
 
+  /// Nombres bonitos para mostrar en UI
   final Map<String, String> _nombresBonitos = {
     'monitor': 'Lab. IoT (Real)',
     'salon1': 'Aula 101',
@@ -38,20 +42,23 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+
+    // Se reciben argumentos desde Login o Dashboard previo
     final args = ModalRoute.of(context)?.settings.arguments;
+
     if (args != null && args is Map<String, dynamic>) {
       userData = args;
 
-      // 1. Obtenemos el ID que viene de Firestore (Ej: "S1" o "MONITOR")
+      // ID del salón en Firestore (ej: “S1”), se normaliza
       String firestoreId =
           userData?['salon_asignado']?.toString().toLowerCase() ?? '';
+
       salonNombre = firestoreId.toUpperCase();
 
-      // 2. Lo traducimos a la llave de Realtime (Ej: "salon1")
-      // Si no encuentra traducción, usa el mismo ID (fallback)
+      // Traducción Firestore → Realtime (S1 → salon1)
       salonId = _mapaIds[firestoreId] ?? firestoreId;
 
-      // 3. Obtener grupo
+      // Obtención del grupo actual asignado al maestro
       if (userData!['grupos'] is List &&
           (userData!['grupos'] as List).isNotEmpty) {
         grupoActual = userData!['grupos'][0];
@@ -63,6 +70,7 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
 
   @override
   Widget build(BuildContext context) {
+    // Mientras cargan argumentos o mapa de IDs
     if (userData == null || salonId == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -83,20 +91,23 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
           ),
         ],
       ),
+
+      // Responsive: Pantallas grandes usan layout web, móviles layout compacto
       body: LayoutBuilder(
         builder: (context, constraints) {
-          if (constraints.maxWidth > 900) {
-            return _buildWebLayout();
-          } else {
-            return _buildMobileLayout();
-          }
+          return constraints.maxWidth > 900
+              ? _buildWebLayout()
+              : _buildMobileLayout();
         },
       ),
     );
   }
 
-  // --- LAYOUTS ---
+  // ---------------------------------------------------------
+  // LAYOUTS (Móvil vs Web)
+  // ---------------------------------------------------------
 
+  /// Diseño para pantallas pequeñas
   Widget _buildMobileLayout() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
@@ -105,6 +116,7 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
         children: [
           _buildWelcomeCard(),
           const SizedBox(height: 20),
+
           Text(
             "MI AULA ACTUAL ($salonNombre)",
             style: const TextStyle(
@@ -114,8 +126,11 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
             ),
           ),
           const SizedBox(height: 10),
+
+          // Estado del salón actual
           _buildCurrentClassSection(),
           const SizedBox(height: 30),
+
           const Text(
             "OTRAS AULAS",
             style: TextStyle(
@@ -125,19 +140,22 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
             ),
           ),
           const SizedBox(height: 10),
+
+          // Lista de salones vecinos
           _buildNeighborsSection(),
         ],
       ),
     );
   }
 
+  /// Layout para escritorio
   Widget _buildWebLayout() {
     return Padding(
       padding: const EdgeInsets.all(24.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // COLUMNA PRINCIPAL
+          // Panel principal
           Expanded(
             flex: 7,
             child: SingleChildScrollView(
@@ -146,6 +164,7 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
                 children: [
                   _buildWelcomeCard(),
                   const SizedBox(height: 25),
+
                   Text(
                     "MI AULA ACTUAL ($salonNombre)",
                     style: const TextStyle(
@@ -155,13 +174,16 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
                     ),
                   ),
                   const SizedBox(height: 15),
+
                   _buildCurrentClassSection(),
                 ],
               ),
             ),
           ),
+
           const SizedBox(width: 24),
-          // COLUMNA LATERAL
+
+          // Panel lateral (salones vecinos)
           Expanded(
             flex: 3,
             child: Container(
@@ -175,17 +197,15 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
                 children: [
                   const Text(
                     "Campus en Vivo",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
+
                   const SizedBox(height: 5),
                   const Text(
                     "Monitoreo de aulas vecinas",
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
+
                   const SizedBox(height: 20),
                   _buildNeighborsSection(),
                 ],
@@ -197,11 +217,15 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
     );
   }
 
-  // --- SECCIÓN CLASE ACTUAL ---
+  // ---------------------------------------------------------
+  // SECCIÓN PRINCIPAL - Estado del salón actual
+  // ---------------------------------------------------------
+
   Widget _buildCurrentClassSection() {
     return StreamBuilder(
       stream: _dbRef.child(salonId!).onValue,
       builder: (context, snapshot) {
+        // Si no hay datos todavía, mostrar cargando
         if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
           return const Card(
             child: Padding(
@@ -211,6 +235,7 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
           );
         }
 
+        // Convertir el snapshot en nuestro modelo
         final dataMap = snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
         final status = SalonStatus.fromRealtime(salonId!, dataMap);
 
@@ -218,10 +243,16 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
           children: [
             _buildStatusCard(status),
             const SizedBox(height: 15),
+
+            // Sensores (Temperatura, Luz, Humedad)
             _buildSensorsGrid(status),
             const SizedBox(height: 15),
+
+            // Actuadores (Ventilador, Ventana)
             _buildActuatorsGrid(status),
             const SizedBox(height: 25),
+
+            // Contenedor de asistencia
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -238,6 +269,7 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Header asistencia
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -268,7 +300,10 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
                       ),
                     ],
                   ),
+
                   const Divider(height: 30),
+
+                  // Lista de alumnos
                   _buildListaAsistencia(),
                 ],
               ),
@@ -279,7 +314,10 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
     );
   }
 
-  // --- SECCIÓN VECINOS ---
+  // ---------------------------------------------------------
+  // SECCIÓN DE AULAS VECINAS
+  // ---------------------------------------------------------
+
   Widget _buildNeighborsSection() {
     return StreamBuilder(
       stream: _dbRef.onValue,
@@ -291,17 +329,19 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
         final data = snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
         final List<SalonStatus> vecinos = [];
 
+        // Recorrer cada salón y convertirlo en SalonStatus
         data.forEach((key, value) {
-          // Filtro: Mostrar todos MENOS el que estoy viendo actualmente
           if (key.toString() != salonId && value is Map) {
             try {
               vecinos.add(SalonStatus.fromRealtime(key.toString(), value));
-            } catch (e) {}
+            } catch (_) {}
           }
         });
 
+        // Orden alfabético
         vecinos.sort((a, b) => a.id.compareTo(b.id));
 
+        // Lista visual
         return ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -329,6 +369,7 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
                   horizontal: 16,
                   vertical: 8,
                 ),
+
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -344,6 +385,7 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
                         : Colors.grey,
                   ),
                 ),
+
                 title: Text(
                   nombre,
                   style: const TextStyle(
@@ -351,6 +393,7 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
                     fontSize: 14,
                   ),
                 ),
+
                 subtitle: Row(
                   children: [
                     Icon(Icons.thermostat, size: 14, color: Colors.orange[800]),
@@ -373,8 +416,11 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
     );
   }
 
-  // --- WIDGETS AUXILIARES ---
+  // ---------------------------------------------------------
+  // TARJETAS Y WIDGETS AUXILIARES
+  // ---------------------------------------------------------
 
+  /// Tarjeta de bienvenida para el maestro
   Widget _buildWelcomeCard() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -389,6 +435,7 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
       ),
       child: Row(
         children: [
+          // Avatar con inicial
           CircleAvatar(
             radius: 25,
             backgroundColor: Colors.white,
@@ -402,6 +449,8 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
             ),
           ),
           const SizedBox(width: 15),
+
+          // Texto de bienvenida
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -424,8 +473,10 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
     );
   }
 
+  /// Tarjeta que indica si el sistema del salón está activo/inactivo
   Widget _buildStatusCard(SalonStatus status) {
     bool activo = status.sistemaActivo;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -437,6 +488,7 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
       ),
       child: Row(
         children: [
+          // Icono circular
           Container(
             padding: const EdgeInsets.all(8),
             decoration: const BoxDecoration(
@@ -449,6 +501,8 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
             ),
           ),
           const SizedBox(width: 15),
+
+          // Texto de estado
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -470,6 +524,7 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
     );
   }
 
+  /// Tarjetas de sensores: Temperatura, Luz, Humedad
   Widget _buildSensorsGrid(SalonStatus status) {
     return Row(
       children: [
@@ -503,6 +558,7 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
     );
   }
 
+  /// Tarjetas de actuadores: Ventilador y Ventana
   Widget _buildActuatorsGrid(SalonStatus status) {
     return Row(
       children: [
@@ -513,30 +569,40 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
     );
   }
 
+  /// Lista de asistencia basada en Firestore
   Widget _buildListaAsistencia() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('alumnos')
           .where('grupo', isEqualTo: grupoActual)
           .snapshots(),
+
       builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
           return const Center(child: Text("Lista vacía"));
+        }
+
         final docs = snapshot.data!.docs;
         int presentes = 0;
+
+        // Lista visual de alumnos
         List<Widget> listaVisual = [];
         for (var doc in docs) {
           final data = doc.data() as Map<String, dynamic>;
-          // Nota: Aquí se usa el RFID Real. Como es una Demo, en los salones falsos nadie tendrá ese rfid, así que saldrán ausentes.
-          // Es el comportamiento correcto para la maqueta.
+
+          // En la demo solo 1 RFID coincide (salón real)
           bool isPresente = (data['rfid'] == _rfidRealAlumno);
+
           if (isPresente) presentes++;
+
           listaVisual.add(
             _buildAlumnoRow(data['nombre'] ?? 'Alumno', isPresente),
           );
         }
+
         return Column(
           children: [
+            // Resumen de asistencia
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
@@ -553,7 +619,10 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
                 ),
               ],
             ),
+
             const SizedBox(height: 20),
+
+            // Lista de alumnos
             ListView(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -565,7 +634,11 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
     );
   }
 
-  // --- UI MICRO ---
+  // ---------------------------------------------------------
+  // Micro widgets
+  // ---------------------------------------------------------
+
+  /// Tarjeta individual de sensor
   Widget _buildInfoCard(IconData i, String v, String l, Color c) => Container(
     padding: const EdgeInsets.symmetric(vertical: 16),
     decoration: BoxDecoration(
@@ -587,6 +660,8 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
       ],
     ),
   );
+
+  /// Chip de estado ON/OFF
   Widget _buildStateChip(String l, bool on) => Container(
     padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
     decoration: BoxDecoration(
@@ -624,6 +699,8 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
       ],
     ),
   );
+
+  /// Contadores de asistencia (total, presentes, faltas)
   Widget _buildSimpleCounter(
     String l,
     String v, {
@@ -641,6 +718,8 @@ class _DashboardMaestroState extends State<DashboardMaestro> {
       Text(l, style: const TextStyle(fontSize: 12, color: Colors.grey)),
     ],
   );
+
+  /// Renglón individual de alumno
   Widget _buildAlumnoRow(String n, bool p) => Padding(
     padding: const EdgeInsets.only(bottom: 10),
     child: Row(

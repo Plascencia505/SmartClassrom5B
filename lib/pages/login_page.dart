@@ -11,8 +11,11 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
-/// Función auxiliar para obtener el hash SHA256 de la contraseña ingresada.
-/// Esto garantiza que la contraseña se valide sin almacenarse en texto plano.
+/// ---------------------------------------------------------------------------
+/// Hash SHA256 de la contraseña ingresada
+/// Se utiliza para comparar con el hash almacenado en Firestore, evitando
+/// el uso de contraseñas en texto plano.
+/// ---------------------------------------------------------------------------
 String hashPassword(String password) {
   final bytes = utf8.encode(password);
   final digest = sha256.convert(bytes);
@@ -21,13 +24,16 @@ String hashPassword(String password) {
 
 class _LoginPageState extends State<LoginPage>
     with SingleTickerProviderStateMixin {
+  // Controladores del formulario
   final _formKey = GlobalKey<FormState>();
   final _workerController = TextEditingController();
   final _passwordController = TextEditingController();
 
+  // Estado del botón y campo de contraseña
   bool _isLoading = false;
   bool _isVisible = false;
 
+  // Animaciones de entrada para el card
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -35,7 +41,8 @@ class _LoginPageState extends State<LoginPage>
   @override
   void initState() {
     super.initState();
-    // Animaciones iniciales de entrada
+
+    /// Configuración inicial de animaciones del login
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
@@ -47,25 +54,35 @@ class _LoginPageState extends State<LoginPage>
     );
 
     _slideAnimation =
-        Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero).animate(
+        Tween<Offset>(
+          begin: const Offset(0, 0.2), // ligeramente abajo
+          end: Offset.zero,
+        ).animate(
           CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
         );
 
-    _animationController.forward();
+    _animationController.forward(); // iniciar animación al montar pantalla
   }
 
   @override
   void dispose() {
+    // Liberar controladores para evitar fugas de memoria
     _animationController.dispose();
     _workerController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  /// Lógica principal del inicio de sesión.
-  /// Valida formulario, busca usuario en Firestore, compara hash y redirige.
+  /// ---------------------------------------------------------------------------
+  /// Lógica de inicio de sesión
+  /// 1. Valida formulario
+  /// 2. Calcula hash de la contraseña ingresada
+  /// 3. Busca usuario en Firestore (documento con su número de trabajador)
+  /// 4. Compara el hash ingresado vs el almacenado
+  /// 5. Redirige según tipo de usuario ("administrativo" / "docente")
+  /// ---------------------------------------------------------------------------
   Future<void> _onLoginPressed() async {
-    if (!_formKey.currentState!.validate()) return; // Validar formulario
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
@@ -73,45 +90,43 @@ class _LoginPageState extends State<LoginPage>
     final password = _passwordController.text.trim();
 
     try {
-      // Generar el hash local de la contraseña ingresada
       final hashedInput = hashPassword(password);
 
-      // Buscar en la colección "usuarios" por el número de trabajador (documentId)
+      // Firestore: búsqueda por documentId (número de trabajador)
       final usuariosSnapshot = await FirebaseFirestore.instance
           .collection('usuarios')
           .where(FieldPath.documentId, isEqualTo: noTrabajador)
           .get();
 
       Map<String, dynamic>? userData;
+
       if (usuariosSnapshot.docs.isNotEmpty) {
         userData = usuariosSnapshot.docs.first.data();
       } else {
         userData = null;
       }
 
-      // Si no se encontró usuario
+      // Usuario no encontrado
       if (userData == null) {
         if (mounted) _showSnackBar("Credenciales inválidas");
         setState(() => _isLoading = false);
         return;
       }
 
-      // Verificar hash de contraseña
+      // Comparación del hash
       if (userData['contrasena_hash'] == hashedInput) {
         if (!mounted) return;
 
         _showSnackBar("Inicio de sesión exitoso");
 
-        // Si el documento tiene campo 'tipo', se usa para decidir destino.
-        // Si no existe, se conserva compatibilidad con el campo 'materia'.
-        final tipo = userData['tipo']; // "administrativo" o "docente"
+        // Tipo de usuario para ruteo: administrativo / docente
+        final tipo = userData['tipo'];
 
         if (tipo == 'administrativo') {
-          //envio de usuario como argumento
           Navigator.pushReplacementNamed(
             context,
             '/dashboard_admin',
-            arguments: userData,
+            arguments: userData, // pasa el mapa completo
           );
         } else if (tipo == 'docente') {
           Navigator.pushReplacementNamed(
@@ -121,11 +136,9 @@ class _LoginPageState extends State<LoginPage>
           );
         }
       } else {
-        // Contraseña incorrecta
         if (mounted) _showSnackBar("Credenciales inválidas");
       }
     } catch (e) {
-      // Manejo de error general de conexión o Firestore
       if (mounted) _showSnackBar("Error al conectar con el servidor");
       debugPrint("Error en login: $e");
     }
@@ -133,7 +146,9 @@ class _LoginPageState extends State<LoginPage>
     if (mounted) setState(() => _isLoading = false);
   }
 
-  /// Muestra mensajes informativos (snackbars) al usuario.
+  /// ---------------------------------------------------------------------------
+  /// Utilidad para mostrar snackbars estilizados.
+  /// ---------------------------------------------------------------------------
   void _showSnackBar(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -145,12 +160,18 @@ class _LoginPageState extends State<LoginPage>
     );
   }
 
-  /// Construcción de la interfaz de inicio de sesión.
-  /// Incluye animaciones, validaciones y diseño responsive.
+  /// ---------------------------------------------------------------------------
+  /// Construcción de UI del login:
+  /// - Fondo con gradiente institucional
+  /// - Card centrado con animación
+  /// - Campos con validación
+  /// - Diseño responsivo con LayoutBuilder
+  /// ---------------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
+        // Fondo con gradiente
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [Color(0xFF527630), Color(0xFF4E4D4D)],
@@ -158,20 +179,22 @@ class _LoginPageState extends State<LoginPage>
             end: Alignment.bottomRight,
           ),
         ),
+
         child: Center(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final bool isWide = constraints.maxWidth > 600;
+              final bool isWide = constraints.maxWidth > 600; // Responsivo
 
               return FadeTransition(
-                opacity: _fadeAnimation,
+                opacity: _fadeAnimation, // efecto fade
                 child: SlideTransition(
-                  position: _slideAnimation,
+                  position: _slideAnimation, // entrada vertical suave
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 400),
                     curve: Curves.easeInOut,
-                    width: isWide ? 400 : 320,
+                    width: isWide ? 400 : 320, // tamaño adaptable
                     padding: const EdgeInsets.all(30),
+
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
@@ -183,6 +206,8 @@ class _LoginPageState extends State<LoginPage>
                         ),
                       ],
                     ),
+
+                    // Formulario principal
                     child: Form(
                       key: _formKey,
                       child: Column(
@@ -196,8 +221,12 @@ class _LoginPageState extends State<LoginPage>
                               color: Color(0xFF64B32E),
                             ),
                           ),
+
                           const SizedBox(height: 25),
-                          // Campo número de trabajador
+
+                          /// ---------------------------------------------------
+                          /// Campo: número de trabajador
+                          /// ---------------------------------------------------
                           TextFormField(
                             controller: _workerController,
                             keyboardType: TextInputType.number,
@@ -224,7 +253,10 @@ class _LoginPageState extends State<LoginPage>
                           ),
 
                           const SizedBox(height: 15),
-                          // Campo contraseña
+
+                          /// ---------------------------------------------------
+                          /// Campo: contraseña con opción de mostrar/ocultar
+                          /// ---------------------------------------------------
                           TextFormField(
                             controller: _passwordController,
                             obscureText: !_isVisible,
@@ -263,7 +295,10 @@ class _LoginPageState extends State<LoginPage>
                           ),
 
                           const SizedBox(height: 25),
-                          // Botón principal
+
+                          /// ---------------------------------------------------
+                          /// Botón principal del login
+                          /// ---------------------------------------------------
                           SizedBox(
                             width: double.infinity,
                             height: 50,
@@ -296,7 +331,8 @@ class _LoginPageState extends State<LoginPage>
                           ),
 
                           const SizedBox(height: 20),
-                          // Pie de página
+
+                          /// Footer institucional
                           const Text(
                             '© 2025 SmartClass, Inc.',
                             style: TextStyle(
