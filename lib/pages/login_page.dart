@@ -107,16 +107,19 @@ class _LoginPageState extends State<LoginPage>
         final tipo = userData['tipo']; // "administrativo" o "docente"
 
         if (tipo == 'administrativo') {
-          Navigator.pushReplacementNamed(context, '/dashboard_admin');
+          //envio de usuario como argumento
+          Navigator.pushReplacementNamed(
+            context,
+            '/dashboard_admin',
+            arguments: userData,
+          );
         } else if (tipo == 'docente') {
-          Navigator.pushReplacementNamed(context, '/dashboard_maestro');
-        } /*else if (userData.containsKey('materia')) {
-          // Caso alternativo: si el usuario tiene una materia, es maestro.
-          Navigator.pushReplacementNamed(context, '/dashboard_maestro');
-        } else {
-          // Si no hay rol ni materia, redirige por defecto al panel admin
-          Navigator.pushReplacementNamed(context, '/dashboard_admin');
-        }*/
+          Navigator.pushReplacementNamed(
+            context,
+            '/dashboard_maestro',
+            arguments: userData,
+          );
+        }
       } else {
         // Contraseña incorrecta
         if (mounted) _showSnackBar("Credenciales inválidas");
